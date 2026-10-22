@@ -1,0 +1,410 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Read Aloud</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: two-pane workbench. Text and live reader on the left, voice and delivery controls on the right; stacks on phones. */
+:root {
+  --bg: #e9eef2;
+  --surface: #f9fbfc;
+  --surface-2: #dfe6ec;
+  --line: #c3cdd6;
+  --fg: #121d27;
+  --muted: #55646f;
+  --accent: #0a7c78;
+  --accent-fg: #ffffff;
+  --mark: #ffd34d;
+  --mark-fg: #121d27;
+  --danger: #b42318;
+  --font-display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1418;
+    --surface: #161f26;
+    --surface-2: #202b33;
+    --line: #2f3d47;
+    --fg: #e6edf2;
+    --muted: #94a5b1;
+    --accent: #3cc7bd;
+    --accent-fg: #06211f;
+    --mark: #f2c230;
+    --mark-fg: #101820;
+    --danger: #ff8a7a;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1418;
+  --surface: #161f26;
+  --surface-2: #202b33;
+  --line: #2f3d47;
+  --fg: #e6edf2;
+  --muted: #94a5b1;
+  --accent: #3cc7bd;
+  --accent-fg: #06211f;
+  --mark: #f2c230;
+  --mark-fg: #101820;
+  --danger: #ff8a7a;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.55;
+  padding-block: 24px 40px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.wrap { max-width: 1040px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: 1.9rem; letter-spacing: -0.02em; margin: 0; text-wrap: balance; }
+.status {
+  font-family: var(--font-mono); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--muted); display: inline-flex; align-items: center; gap: 8px;
+}
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); }
+.status[data-state="speaking"] .dot { background: var(--accent); animation: pulse 1.1s ease-in-out infinite; }
+.status[data-state="paused"] .dot { background: var(--mark); }
+@keyframes pulse { 50% { transform: scale(1.5); opacity: .55; } }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 760px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.label { font-family: var(--font-mono); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+
+.field { position: relative; }
+textarea, .reader {
+  width: 100%; min-height: 260px; max-height: 420px; overflow: auto;
+  font: inherit; font-size: 16px; line-height: 1.65; color: var(--fg);
+  background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 14px;
+}
+textarea { resize: vertical; display: block; }
+.reader { white-space: pre-wrap; overflow-wrap: anywhere; }
+.reader mark { background: var(--mark); color: var(--mark-fg); border-radius: 3px; padding: 0 2px; }
+.reader .done { color: var(--muted); }
+
+.progress { height: 4px; background: var(--surface-2); border-radius: 2px; overflow: hidden; }
+.progress > span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s linear; }
+
+.meta { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-family: var(--font-mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+button {
+  font: inherit; font-weight: 500; cursor: pointer; border-radius: 8px; padding: 10px 18px;
+  border: 1px solid var(--line); background: var(--surface-2); color: var(--fg);
+}
+button:hover { border-color: var(--muted); }
+button.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); min-width: 120px; }
+button.primary:hover { filter: brightness(1.08); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+select {
+  width: 100%; font: inherit; color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px;
+}
+.control { display: flex; flex-direction: column; gap: 6px; }
+.control .row { display: flex; justify-content: space-between; align-items: baseline; }
+.value { font-family: var(--font-mono); font-size: 13px; font-variant-numeric: tabular-nums; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+
+.note { font-size: 13px; color: var(--muted); margin: 0; }
+.warn { color: var(--danger); font-size: 14px; margin: 0; }
+.link { background: none; border: none; padding: 0; color: var(--accent); text-decoration: underline; font-size: 13px; text-align: left; align-self: flex-start; }
+
+@media (prefers-reduced-motion: reduce) { .status[data-state="speaking"] .dot { animation: none; } .progress > span { transition: none; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Read Aloud</h1>
+    <span class="status" id="status" data-state="idle"><span class="dot"></span><span id="statusText">Ready</span></span>
+  </header>
+
+  <p class="warn" id="unsupported" hidden>This browser does not support speech synthesis. Try Chrome, Edge, Safari or Firefox on a recent version.</p>
+
+  <div class="grid">
+    <section class="panel" aria-label="Text">
+      <div class="label">Text to read</div>
+      <div class="field">
+        <textarea id="text" spellcheck="true" aria-label="Text to read aloud">Good morning. This is a short test of the text to speech reader. Type or paste anything you like, choose a voice, then press Play. The words are highlighted as they are spoken, so you can follow along. Try changing the speed or pitch while it plays.</textarea>
+        <div class="reader" id="reader" hidden aria-live="off"></div>
+      </div>
+      <div class="progress" aria-hidden="true"><span id="bar"></span></div>
+      <div class="meta"><span id="count">0 words</span><span id="eta">about 0 s</span></div>
+      <div class="actions">
+        <button class="primary" id="play" type="button">Play</button>
+        <button id="stop" type="button" disabled>Stop</button>
+        <button id="clear" type="button">Clear</button>
+      </div>
+      <p class="note">Shortcut: Ctrl or Cmd + Enter starts and pauses.</p>
+    </section>
+
+    <section class="panel" aria-label="Voice settings">
+      <div class="control">
+        <label class="label" for="voice">Voice</label>
+        <select id="voice"></select>
+        <p class="note" id="voiceNote"></p>
+      </div>
+      <div class="control">
+        <div class="row"><label class="label" for="rate">Speed</label><span class="value" id="rateV">1.00x</span></div>
+        <input id="rate" type="range" min="0.5" max="2" step="0.05" value="1">
+      </div>
+      <div class="control">
+        <div class="row"><label class="label" for="pitch">Pitch</label><span class="value" id="pitchV">1.00</span></div>
+        <input id="pitch" type="range" min="0" max="2" step="0.05" value="1">
+      </div>
+      <div class="control">
+        <div class="row"><label class="label" for="volume">Volume</label><span class="value" id="volumeV">100%</span></div>
+        <input id="volume" type="range" min="0" max="1" step="0.05" value="1">
+      </div>
+      <button class="link" id="reset" type="button">Reset to defaults</button>
+    </section>
+  </div>
+</div>
+
+<script>
+(function () {
+  var synth = window.speechSynthesis;
+  var $ = function (id) { return document.getElementById(id); };
+  var els = {
+    text: $('text'), reader: $('reader'), play: $('play'), stop: $('stop'), clear: $('clear'),
+    voice: $('voice'), rate: $('rate'), pitch: $('pitch'), volume: $('volume'),
+    rateV: $('rateV'), pitchV: $('pitchV'), volumeV: $('volumeV'),
+    bar: $('bar'), count: $('count'), eta: $('eta'), status: $('status'), statusText: $('statusText'),
+    note: $('voiceNote'), unsupported: $('unsupported'), reset: $('reset')
+  };
+
+  if (!synth || typeof SpeechSynthesisUtterance === 'undefined') {
+    els.unsupported.hidden = false;
+    els.play.disabled = true;
+    return;
+  }
+
+  var DEFAULTS = { rate: 1, pitch: 1, volume: 1, voice: '' };
+  var prefs = Object.assign({}, DEFAULTS);
+  try {
+    var saved = JSON.parse(localStorage.getItem('read-aloud-prefs') || '{}');
+    Object.keys(DEFAULTS).forEach(function (k) { if (saved[k] !== undefined) prefs[k] = saved[k]; });
+  } catch (e) {}
+  function savePrefs() { try { localStorage.setItem('read-aloud-prefs', JSON.stringify(prefs)); } catch (e) {} }
+
+  var voices = [];
+  var run = { token: 0, text: '', chunks: [], active: false, paused: false, pos: 0 };
+
+  /* ---------- voices ---------- */
+  var langNames = null;
+  try { langNames = new Intl.DisplayNames([navigator.language || 'en'], { type: 'language' }); } catch (e) {}
+  function langLabel(code) {
+    var base = (code || '').replace('_', '-');
+    try { return (langNames && langNames.of(base)) || base; } catch (e) { return base; }
+  }
+
+  function loadVoices() {
+    voices = synth.getVoices().slice().sort(function (a, b) {
+      return a.lang.localeCompare(b.lang) || a.name.localeCompare(b.name);
+    });
+    var sel = els.voice;
+    sel.innerHTML = '';
+    var def = document.createElement('option');
+    def.value = ''; def.textContent = 'System default';
+    sel.appendChild(def);
+    var groups = {};
+    voices.forEach(function (v) {
+      var key = langLabel(v.lang);
+      if (!groups[key]) {
+        groups[key] = document.createElement('optgroup');
+        groups[key].label = key;
+        sel.appendChild(groups[key]);
+      }
+      var o = document.createElement('option');
+      o.value = v.voiceURI;
+      o.textContent = v.name + (v.localService ? '' : ' (online)');
+      groups[key].appendChild(o);
+    });
+    var wanted = prefs.voice;
+    var exists = voices.some(function (v) { return v.voiceURI === wanted; });
+    if (!exists) {
+      var lang = (navigator.language || 'en').toLowerCase();
+      var match = voices.filter(function (v) { return v.lang.toLowerCase().indexOf(lang.split('-')[0]) === 0; });
+      var pick = match.filter(function (v) { return v.default; })[0] || match[0];
+      wanted = pick ? pick.voiceURI : '';
+    }
+    sel.value = wanted;
+    els.note.textContent = voices.length
+      ? voices.length + ' voices installed on this device.'
+      : 'No voices reported yet. The system default will be used.';
+  }
+  loadVoices();
+  if (synth.addEventListener) synth.addEventListener('voiceschanged', loadVoices);
+  else synth.onvoiceschanged = loadVoices;
+
+  function currentVoice() {
+    var uri = els.voice.value;
+    return voices.filter(function (v) { return v.voiceURI === uri; })[0] || null;
+  }
+
+  /* ---------- text helpers ---------- */
+  function words(s) { var m = s.trim().match(/\S+/g); return m ? m.length : 0; }
+
+  function updateMeta() {
+    var n = words(els.text.value);
+    els.count.textContent = n + (n === 1 ? ' word' : ' words') + ' · ' + els.text.value.length + ' characters';
+    var secs = Math.round((n / (160 * Number(els.rate.value))) * 60);
+    els.eta.textContent = secs < 60 ? 'about ' + secs + ' s' : 'about ' + Math.floor(secs / 60) + ' min ' + (secs % 60) + ' s';
+  }
+
+  function makeChunks(text, from) {
+    var out = [], re = /[^.!?;\n]+[.!?;]*\s*|\n+/g, m, cur = null;
+    while ((m = re.exec(text.slice(from))) !== null) {
+      var s = from + m.index, e = s + m[0].length;
+      if (!m[0].trim()) { if (cur) cur.end = e; continue; }
+      if (cur && cur.end - cur.start < 160) { cur.end = e; }
+      else { cur = { start: s, end: e }; out.push(cur); }
+    }
+    return out;
+  }
+
+  /* ---------- reader highlight ---------- */
+  function showReader(on) {
+    els.reader.hidden = !on;
+    els.text.hidden = on;
+  }
+  function highlight(pos) {
+    run.pos = pos;
+    var t = run.text;
+    var rest = t.slice(pos);
+    var m = rest.match(/^\S+/);
+    var len = m ? m[0].length : 1;
+    var r = els.reader;
+    r.textContent = '';
+    var a = document.createElement('span'); a.className = 'done'; a.textContent = t.slice(0, pos);
+    var mk = document.createElement('mark'); mk.textContent = t.slice(pos, pos + len);
+    var b = document.createTextNode(t.slice(pos + len));
+    r.appendChild(a); r.appendChild(mk); r.appendChild(b);
+    var top = mk.offsetTop - r.offsetTop;
+    if (top < r.scrollTop + 20 || top > r.scrollTop + r.clientHeight - 60) {
+      r.scrollTop = Math.max(0, top - r.clientHeight / 3);
+    }
+    els.bar.style.width = Math.min(100, (pos / Math.max(1, t.length)) * 100) + '%';
+  }
+
+  /* ---------- state ---------- */
+  function setState(state, label) {
+    els.status.dataset.state = state;
+    els.statusText.textContent = label;
+    els.play.textContent = state === 'speaking' ? 'Pause' : state === 'paused' ? 'Resume' : 'Play';
+    els.stop.disabled = state === 'idle';
+  }
+
+  function finish() {
+    run.active = false; run.paused = false; run.token++;
+    showReader(false);
+    els.bar.style.width = '0';
+    setState('idle', 'Ready');
+  }
+
+  /* ---------- speaking ---------- */
+  function speakChunk(i, token) {
+    if (token !== run.token) return;
+    if (i >= run.chunks.length) { finish(); return; }
+    var c = run.chunks[i];
+    var u = new SpeechSynthesisUtterance(run.text.slice(c.start, c.end));
+    var v = currentVoice();
+    if (v) { u.voice = v; u.lang = v.lang; }
+    u.rate = Number(els.rate.value);
+    u.pitch = Number(els.pitch.value);
+    u.volume = Number(els.volume.value);
+    u.onstart = function () { if (token === run.token) highlight(c.start); };
+    u.onboundary = function (e) {
+      if (token !== run.token) return;
+      if (e.name && e.name !== 'word') return;
+      highlight(c.start + e.charIndex);
+    };
+    u.onend = function () { speakChunk(i + 1, token); };
+    u.onerror = function (e) {
+      if (token !== run.token) return;
+      if (e.error === 'canceled' || e.error === 'interrupted') return;
+      finish();
+      els.note.textContent = 'Speech failed (' + e.error + '). Try another voice.';
+    };
+    synth.speak(u);
+  }
+
+  function startFrom(pos) {
+    var text = run.text || els.text.value;
+    run.text = text;
+    run.chunks = makeChunks(text, pos);
+    if (!run.chunks.length) { finish(); return; }
+    run.token++;
+    var token = run.token;
+    synth.cancel();
+    run.active = true; run.paused = false;
+    showReader(true);
+    highlight(run.chunks[0].start);
+    setState('speaking', 'Speaking');
+    /* A short delay lets cancel() settle, which avoids dropped utterances in Chrome. */
+    setTimeout(function () { speakChunk(0, token); }, 60);
+  }
+
+  function play() {
+    if (!run.active) {
+      if (!els.text.value.trim()) { els.text.focus(); return; }
+      run.text = els.text.value;
+      startFrom(0);
+    } else if (run.paused) {
+      synth.resume(); run.paused = false; setState('speaking', 'Speaking');
+    } else {
+      synth.pause(); run.paused = true; setState('paused', 'Paused');
+    }
+  }
+
+  function stop() { run.token++; synth.cancel(); finish(); }
+
+  /* Setting changes while speaking restart from the current word. */
+  function restartIfActive() {
+    if (run.active && !run.paused) startFrom(run.pos);
+  }
+
+  /* ---------- wiring ---------- */
+  els.play.addEventListener('click', play);
+  els.stop.addEventListener('click', stop);
+  els.clear.addEventListener('click', function () { stop(); els.text.value = ''; updateMeta(); els.text.focus(); });
+  els.text.addEventListener('input', updateMeta);
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); play(); }
+  });
+
+  function syncLabels() {
+    els.rateV.textContent = Number(els.rate.value).toFixed(2) + 'x';
+    els.pitchV.textContent = Number(els.pitch.value).toFixed(2);
+    els.volumeV.textContent = Math.round(Number(els.volume.value) * 100) + '%';
+    updateMeta();
+  }
+  ['rate', 'pitch', 'volume'].forEach(function (k) {
+    els[k].value = prefs[k];
+    els[k].addEventListener('input', syncLabels);
+    els[k].addEventListener('change', function () { prefs[k] = Number(els[k].value); savePrefs(); restartIfActive(); });
+  });
+  els.voice.addEventListener('change', function () { prefs.voice = els.voice.value; savePrefs(); restartIfActive(); });
+  els.reset.addEventListener('click', function () {
+    prefs.rate = DEFAULTS.rate; prefs.pitch = DEFAULTS.pitch; prefs.volume = DEFAULTS.volume;
+    ['rate', 'pitch', 'volume'].forEach(function (k) { els[k].value = DEFAULTS[k]; });
+    savePrefs(); syncLabels(); restartIfActive();
+  });
+  window.addEventListener('pagehide', function () { synth.cancel(); });
+
+  syncLabels();
+})();
+</script>
+
+</body></html>
